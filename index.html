@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المساعد الذكي - SmartSystem Pro</title>
+    <!-- استدعاء Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- استدعاء مكتبة Marked لعرض تنسيقات Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+        }
+        .recording-animation {
+            animation: pulse-red 1.2s infinite;
+            color: #ef4444 !important;
+        }
+        .text-size-sm { font-size: 0.75rem; }
+        .text-size-md { font-size: 0.875rem; }
+        .text-size-lg { font-size: 1rem; }
+
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            font-weight: bold;
+            margin-top: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .markdown-content ul, .markdown-content ol {
+            padding-right: 1.25rem;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .markdown-content ul { list-style-type: disc; }
+        .markdown-content ol { list-style-type: decimal; }
+        .markdown-content p { margin-bottom: 0.5rem; }
+        .markdown-content strong { font-weight: bold; }
+    </style>
+</head>
+<body id="app-body" class="flex h-screen overflow-hidden bg-zinc-50 dark:bg-[#0f0f11] text-zinc-900 dark:text-white transition-colors duration-200 text-size-sm">
+
+    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+    <button id="exit-focus-btn" onclick="toggleFocusMode()" class="hidden fixed top-4 right-4 z-50 bg-amber-500 hover:bg-amber-600 text-black font-bold px-3 py-1.5 rounded-xl shadow-2xl text-xs flex items-center gap-2 transition cursor-pointer">
+        <i class="fa-solid fa-compress"></i> الخروج من وضع التركيز
+    </button>
+
+    <aside id="sidebar" class="w-72 bg-white dark:bg-[#141416] border-l border-zinc-200 dark:border-zinc-800 flex flex-col justify-between p-3 select-none transition-all duration-300 z-30">
+        <div>
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="bg-yellow-500/10 p-1.5 rounded-xl text-yellow-500 text-lg">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-xs">المساعد الذكي</h1>
+                        <span class="text-[9px] text-zinc-500 dark:text-zinc-400 tracking-wider">SMART SYSTEM</span>
+                    </div>
+                </div>
+                <button onclick="toggleSidebar()" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition text-xs cursor-pointer" title="إخفاء القائمة"><i class="fa-solid fa-bars"></i></button>
+            </div>
+
+            <div class="space-y-1.5 mb-4">
+                <button onclick="clearChat()" class="w-full flex items-center gap-2.5 bg-zinc-100 dark:bg-[#1d1d20] hover:bg-zinc-200 dark:hover:bg-[#252529] p-2 rounded-xl text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-plus text-[10px]"></i> محادثة جديدة
+                </button>
+                <button onclick="openFavoritesModal()" class="w-full flex items-center gap-2.5 bg-amber-50 dark:bg-[#2e2612] hover:bg-amber-100 dark:hover:bg-[#3b3117] text-amber-700 dark:text-amber-400 p-2 rounded-xl text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-star"></i> الأسئلة المفضلة المحفوظة (<span id="fav-count">0</span>)
+                </button>
+                <button onclick="openNotebook()" class="w-full flex items-center gap-2.5 bg-purple-50 dark:bg-[#2a1b3d] hover:bg-purple-100 dark:hover:bg-[#34224c] text-purple-700 dark:text-purple-300 p-2 rounded-xl text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-book-bookmark"></i> دفتر ملاحظات المادة
+                </button>
+                <button onclick="exportChatToFile()" class="w-full flex items-center gap-2.5 bg-blue-50 dark:bg-[#152438] hover:bg-blue-100 dark:hover:bg-[#1d324f] text-blue-700 dark:text-blue-300 p-2 rounded-xl text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-file-arrow-down"></i> تصدير المحادثة (.txt)
+                </button>
+                <button onclick="openApiKeyModal()" class="w-full flex items-center gap-2.5 bg-yellow-50 dark:bg-[#2e2612] hover:bg-yellow-100 dark:hover:bg-[#3b3117] text-yellow-700 dark:text-yellow-400 p-2 rounded-xl text-xs transition cursor-pointer">
+                    <i class="fa-solid fa-key"></i> مفتاح Gemini API
+                </button>
+            </div>
+
+            <div>
+                <p class="text-[11px] text-zinc-500 mb-1.5 px-1">مواد الصف الخامس الابتدائي</p>
+                <div id="subjects-list" class="space-y-1">
+                    <a href="#" onclick="changeSubject('التربية الإسلامية', 'fa-mosque', 'text-emerald-600 dark:text-emerald-400', event)" class="subject-item flex items-center gap-2.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white p-2 rounded-xl text-xs font-medium transition">
+                        <i class="fa-solid fa-mosque text-emerald-600 dark:text-emerald-400"></i> التربية الإسلامية
+                    </a>
+                    <a href="#" onclick="changeSubject('قواعد اللغة العربية', 'fa-book', 'text-blue-600 dark:text-blue-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-book text-blue-600 dark:text-blue-400"></i> قواعد اللغة العربية
+                    </a>
+                    <a href="#" onclick="changeSubject('القراءة والتعبير', 'fa-book-open', 'text-indigo-600 dark:text-indigo-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-book-open text-indigo-600 dark:text-indigo-400"></i> القراءة والتعبير
+                    </a>
+                    <a href="#" onclick="changeSubject('العلوم', 'fa-atom', 'text-cyan-600 dark:text-cyan-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-atom text-cyan-600 dark:text-cyan-400"></i> العلوم
+                    </a>
+                    <a href="#" onclick="changeSubject('الاجتماعيات', 'fa-earth-americas', 'text-orange-600 dark:text-orange-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-earth-americas text-orange-600 dark:text-orange-400"></i> الاجتماعيات
+                    </a>
+                    <a href="#" onclick="changeSubject('اللغة الإنجليزية (English)', 'fa-language', 'text-amber-600 dark:text-amber-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-language text-amber-600 dark:text-amber-400"></i> اللغة الإنجليزية (English)
+                    </a>
+                    <a href="#" onclick="changeSubject('الرياضيات', 'fa-calculator', 'text-rose-600 dark:text-rose-400', event)" class="subject-item flex items-center gap-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 p-2 rounded-xl text-xs transition[cite: 1]">
+                        <i class="fa-solid fa-calculator text-rose-600 dark:text-rose-400"></i> الرياضيات
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-500">
+            <span class="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md">محمي وآمن</span>
+            <span>SmartSystem v10.0</span>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col justify-between p-4 md:p-6 overflow-hidden relative">
+        
+        <div id="top-nav-bar" class="flex items-center justify-between w-full pb-3 border-b border-zinc-200 dark:border-zinc-800/60 transition-all duration-300">
+            <div class="flex items-center gap-2">
+                <button onclick="toggleSidebar()" class="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 p-2 rounded-xl text-xs transition cursor-pointer" title="القائمة الجانبية"><i class="fa-solid fa-bars"></i></button>
+                <div id="current-subject-badge" class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-mosque text-emerald-600 dark:text-emerald-400 text-xs"></i> <span id="badge-text">التربية الإسلامية</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                <button onclick="toggleFocusMode()" class="bg-amber-100 dark:bg-[#2e2612] hover:bg-amber-200 dark:hover:bg-[#3b3117] text-amber-800 dark:text-amber-400 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer" title="وضع التركيز التام"><i class="fa-solid fa-expand"></i> <span class="hidden md:inline">تركيز</span></button>
+                <div class="hidden sm:flex items-center bg-zinc-200 dark:bg-zinc-800 rounded-xl p-0.5">
+                    <button onclick="setFontSize('sm')" class="px-2 py-1 text-[10px] rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition cursor-pointer">A-</button>
+                    <button onclick="setFontSize('md')" class="px-2 py-1 text-[10px] rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition cursor-pointer">A</button>
+                    <button onclick="setFontSize('lg')" class="px-2 py-1 text-[10px] rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition cursor-pointer">A+</button>
+                </div>
+                <button onclick="toggleTheme()" class="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer"><i id="theme-icon" class="fa-solid fa-sun text-amber-500"></i></button>
+                <button onclick="openNotebook()" class="bg-purple-100 dark:bg-[#2a1b3d] hover:bg-purple-200 dark:hover:bg-[#34224c] text-purple-700 dark:text-purple-300 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer"><i class="fa-solid fa-book-bookmark"></i> <span class="hidden md:inline">ملاحظات</span></button>
+                <button onclick="openApiKeyModal()" class="bg-yellow-100 dark:bg-[#2e2612] hover:bg-yellow-200 dark:hover:bg-[#3b3117] text-yellow-800 dark:text-yellow-400 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer"><i class="fa-solid fa-key"></i></button>
+                <button onclick="clearChat()" class="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto py-4 space-y-4 px-2"></div>
+
+        <div id="image-preview-container" class="hidden max-w-4xl mx-auto w-full px-2 mb-2 flex items-center gap-2">
+            <div class="relative bg-zinc-200 dark:bg-zinc-800 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 flex items-center gap-2">
+                <img id="preview-img" src="" class="w-10 h-10 object-cover rounded-lg">
+                <span class="text-[11px] text-zinc-700 dark:text-zinc-300">تم إرفاق الصورة، جاهزة للإرسال</span>
+                <button onclick="removeAttachedImage()" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>
+
+        <div class="max-w-4xl w-full mx-auto bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 relative shadow-2xl mt-1 transition-colors duration-200">
+            <input id="user-input" type="text" placeholder="اسأل معلم المادة أي سؤال.. أو ارفع صورة للتمارين..." class="w-full bg-transparent text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none mb-8 pr-2" onkeydown="if(event.key === 'Enter') sendMessage()">
+            
+            <div class="absolute top-2.5 left-1/2 -translate-x-1/2 bg-zinc-100 dark:bg-[#27272a] text-zinc-700 dark:text-zinc-200 text-[10px] px-3 py-0.5 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700">
+                SmartSystem Assistant
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-zinc-200 dark:border-zinc-800/60 px-1">
+                <div class="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 text-sm">
+                    <label class="hover:text-zinc-900 dark:hover:text-white transition cursor-pointer" title="رفع صورة">
+                        <i class="fa-solid fa-image"></i>
+                        <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                    <label class="hover:text-zinc-900 dark:hover:text-white transition cursor-pointer" title="كاميرا">
+                        <i class="fa-solid fa-camera"></i>
+                        <input type="file" id="camera-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+                <button onclick="sendMessage()" class="bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-black text-xs font-bold px-4 py-1.5 rounded-xl flex items-center gap-1.5 transition cursor-pointer">
+                    إرسال <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- النوافذ المنبثقة -->
+    <div id="notebook-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 w-96 rounded-2xl p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <h3 id="notebook-title" class="text-sm font-bold text-purple-700 dark:text-purple-300">دفتر ملاحظات المادة</h3>
+                <button onclick="closeNotebook()" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <textarea id="notebook-content" class="w-full h-40 bg-zinc-50 dark:bg-[#111113] border border-zinc-300 dark:border-zinc-700 rounded-xl p-2 text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none resize-none" placeholder="اكتب ملاحظاتك الخاصة بهذه المادة هنا..."></textarea>
+            <button onclick="saveNotebook()" class="w-full mt-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 rounded-xl transition cursor-pointer">حفظ الملاحظات</button>
+        </div>
+    </div>
+
+    <div id="favorites-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 w-full max-w-xl max-h-[80vh] flex flex-col rounded-2xl p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 class="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5"><i class="fa-solid fa-star"></i> الأسئلة والإجابات المفضلة</h3>
+                <button onclick="closeFavoritesModal()" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="favorites-list-container" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+        </div>
+    </div>
+
+    <div id="apiKey-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 w-96 rounded-2xl p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-yellow-600 dark:text-yellow-400">إدارة مفتاح Gemini API</h3>
+                <button onclick="closeApiKeyModal()" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-3 leading-relaxed">أدخل مفتاح الـ API الخاص بك أدناه ليتم حفظه محلياً:</p>
+            <input id="api-key-input" type="password" class="w-full bg-zinc-50 dark:bg-[#111113] border border-zinc-300 dark:border-zinc-700 rounded-xl p-2.5 text-xs text-zinc-900 dark:text-zinc-200 focus:outline-none mb-3" placeholder="AIzaSy...">
+            <button onclick="saveApiKey()" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold py-2 rounded-xl transition cursor-pointer mb-3">حفظ المفتاح</button>
+            <div class="pt-3 border-t border-zinc-200 dark:border-zinc-800 text-center">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-external-link-alt"></i> احصل على مفتاح مجاني
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- أكواد الجافاسكريبت مع الربط السري لملفات البرومبتات الخفية -->
+    <script>
+        let currentSubject = "التربية الإسلامية";
+        let notebooks = JSON.parse(localStorage.getItem('smart_notebooks_v10')) || {}; 
+        let attachedImageBase64 = null;
+        let attachedImageMimeType = null;
+        let chatHistory = JSON.parse(localStorage.getItem('smart_chat_history_v10')) || [];
+        let favorites = JSON.parse(localStorage.getItem('smart_favorites_v10')) || [];
+
+        // خريطة ربط المواد بملفاتها النصية المخفية سراً (بدون تضخيم الكود وبدون سيرفرات)
+        const subjectFiles = {
+            "التربية الإسلامية": "prompts/التربية الإسلامية.txt",
+            "قواعد اللغة العربية": "prompts/قواعد اللغة العربية.txt",
+            "القراءة والتعبير": "prompts/القراءة والتعبير.txt",
+            "العلوم": "prompts/العلوم.txt",
+            "الاجتماعيات": "prompts/الاجتماعيات.txt",
+            "اللغة الإنجليزية (English)": "prompts/اللغة الإنجليزية.txt",
+            "الرياضيات": "prompts/الرياضيات.txt"
+        };
+
+        // دالة سحب البرومبت الضخم سراً من الملف الخارجي
+        async function getSystemPrompt(subject) {
+            const filePath = subjectFiles[subject];
+            if (!filePath) return "أنت معلم ذكي ومساعد تعليمي للمرحلة الابتدائية.";
+            
+            try {
+                const response = await fetch(encodeURI(filePath));
+                if (response.ok) {
+                    return await response.text(); // سحب الـ 6-7 صفحات سراً من الملف
+                }
+            } catch (error) {
+                console.error("تعذر قراءة ملف المادة الخارجي:", error);
+            }
+            return "أنت معلم ذكي ومساعد تعليمي للمرحلة الابتدائية.";
+        }
+
+        window.onload = function() {
+            const savedTheme = localStorage.getItem('smart_theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').className = "fa-solid fa-moon text-purple-600";
+            }
+            const savedFont = localStorage.getItem('smart_font') || 'text-size-md';
+            setFontSize(savedFont.replace('text-size-', ''), true);
+            updateFavCount();
+            renderChatHistory();
+        };
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : type === 'error' ? 'bg-red-600 text-white' : 'bg-zinc-800 text-white';
+            toast.className = `${bgClass} text-xs px-4 py-2 rounded-xl shadow-xl pointer-events-auto transition-all duration-300 transform translate-y-[-10px] opacity-0 flex items-center gap-2`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> ${message}`;
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-[-10px]', 'opacity-0'); }, 50);
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-10px]', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function toggleFocusMode() {
+            const sidebar = document.getElementById('sidebar');
+            const topBar = document.getElementById('top-nav-bar');
+            const exitBtn = document.getElementById('exit-focus-btn');
+            
+            if(!sidebar.classList.contains('hidden') || !topBar.classList.contains('hidden')) {
+                sidebar.classList.add('hidden');
+                topBar.classList.add('hidden');
+                exitBtn.classList.remove('hidden');
+                showToast("تم تفعيل وضع التركيز التام 🧘‍♂️");
+            } else {
+                sidebar.classList.remove('hidden');
+                topBar.classList.remove('hidden');
+                exitBtn.classList.add('hidden');
+                showToast("تم الخروج من وضع التركيز");
+            }
+        }
+
+        function toggleFavorite(question, answer, subject) {
+            const index = favorites.findIndex(item => item.question === question && item.subject === subject);
+            if (index > -1) {
+                favorites.splice(index, 1);
+                showToast("تمت إزالة السؤال من المفضلة");
+            } else {
+                favorites.push({ question, answer, subject });
+                showToast("تم حفظ السؤال في المفضلة بنجاح ⭐");
+            }
+            localStorage.setItem('smart_favorites_v10', JSON.stringify(favorites));
+            updateFavCount();
+            renderChatHistory();
+        }
+
+        function updateFavCount() {
+            document.getElementById('fav-count').innerText = favorites.length;
+        }
+
+        function openFavoritesModal() {
+            const container = document.getElementById('favorites-list-container');
+            container.innerHTML = "";
+            if(favorites.length === 0) {
+                container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-6">لا توجد أسئلة محفوظة في المفضلة حالياً.</p>`;
+            } else {
+                favorites.forEach((fav) => {
+                    const item = document.createElement('div');
+                    item.className = "bg-zinc-50 dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-xs space-y-1.5";
+                    item.innerHTML = `
+                        <div class="flex justify-between items-center text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                            <span><i class="fa-solid fa-graduation-cap"></i> ${fav.subject}</span>
+                            <button onclick="toggleFavorite('${fav.question.replace(/'/g, "\\'")}', '', '${fav.subject}'); openFavoritesModal();" class="text-red-500 hover:text-red-700 cursor-pointer"><i class="fa-solid fa-trash"></i> إزالة</button>
+                        </div>
+                        <p class="font-bold text-zinc-900 dark:text-white">س: ${escapeHtml(fav.question)}</p>
+                        <div class="text-zinc-600 dark:text-zinc-300 border-t border-zinc-200 dark:border-zinc-800 pt-1.5 markdown-content">${marked.parse(fav.answer)}</div>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+            document.getElementById('favorites-modal').classList.remove('hidden');
+        }
+        function closeFavoritesModal() { document.getElementById('favorites-modal').classList.add('hidden'); }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
+
+        function setFontSize(size, init = false) {
+            const body = document.getElementById('app-body');
+            body.classList.remove('text-size-sm', 'text-size-md', 'text-size-lg');
+            body.classList.add(`text-size-${size}`);
+            if(!init) {
+                localStorage.setItem('smart_font', `text-size-${size}`);
+                showToast(`تم تغيير حجم الخط بنجاح ✨`);
+            }
+        }
+
+        function exportChatToFile() {
+            const subjectHistory = chatHistory.filter(item => item.subject === currentSubject);
+            if(subjectHistory.length === 0) {
+                showToast("لا توجد محادثات لتصديرها في هذه المادة!", "error");
+                return;
+            }
+            let textContent = `سجل محادثات مادة: ${currentSubject} - SmartSystem Pro\n----------------------------------------\n\n`;
+            subjectHistory.forEach((item, index) => {
+                textContent += `[سؤال ${index + 1}]: ${item.question}\n`;
+                textContent += `[معلم ${item.subject}]: ${item.answer}\n\n----------------------------------------\n\n`;
+            });
+
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `محادثة_${currentSubject}_SmartSystem.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast("تم تصدير المحادثة وحفظها بنجاح 📁");
+        }
+
+        function toggleTheme() {
+            const htmlEl = document.documentElement;
+            const themeIcon = document.getElementById('theme-icon');
+            if (htmlEl.classList.contains('dark')) {
+                htmlEl.classList.remove('dark');
+                themeIcon.className = "fa-solid fa-moon text-purple-600";
+                localStorage.setItem('smart_theme', 'light');
+                showToast("تم تفعيل الوضع النهاري ☀️");
+            } else {
+                htmlEl.classList.add('dark');
+                themeIcon.className = "fa-solid fa-sun text-amber-500";
+                localStorage.setItem('smart_theme', 'dark');
+                showToast("تم تفعيل الوضع الليلي 🌙");
+            }
+        }
+
+        function changeSubject(subjectName, iconClass, iconColor, event) {
+            event.preventDefault();
+            currentSubject = subjectName;
+            
+            document.querySelectorAll('.subject-item').forEach(item => {
+                item.classList.remove('bg-zinc-200', 'dark:bg-zinc-800', 'text-zinc-900', 'dark:text-white', 'font-medium');
+                item.classList.add('text-zinc-600', 'dark:text-zinc-400');
+            });
+            
+            const clickedItem = event.currentTarget;
+            clickedItem.classList.add('bg-zinc-200', 'dark:bg-zinc-800', 'text-zinc-900', 'dark:text-white', 'font-medium');
+            clickedItem.classList.remove('text-zinc-600', 'dark:text-zinc-400');
+
+            document.getElementById('badge-text').innerText = subjectName;
+            document.querySelector('#current-subject-badge i').className = `fa-solid ${iconClass} ${iconColor} text-xs`;
+            
+            renderChatHistory();
+        }
+
+        function renderChatHistory() {
+            const chatContainer = document.getElementById('chat-container');
+            const subjectHistory = chatHistory.filter(item => item.subject === currentSubject);
+
+            if (subjectHistory.length === 0) {
+                chatContainer.innerHTML = `
+                    <div id="welcome-screen" class="flex flex-col items-center text-center max-w-2xl mx-auto my-auto h-full justify-center">
+                        <div class="w-16 h-16 bg-zinc-100 dark:bg-[#1f1f23] border border-zinc-200 dark:border-zinc-700 rounded-2xl flex items-center justify-center text-yellow-500 text-2xl mb-4 shadow-lg">
+                            <i class="fa-solid fa-graduation-cap text-yellow-500 text-2xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-pink-600 dark:text-pink-400 mb-2">أهلاً بك يا بطل/ة الصف الخامس!</h2>
+                        <p class="text-xs font-semibold text-yellow-600 dark:text-yellow-500 mb-3">المساعد الذكي مع SmartSystem</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-6">معلم مادة ${currentSubject} للصف الخامس الابتدائي. جاهز لشرح الدروس والتمارين وحل المسائل بدقة وسهولة.</p>
+                        <div class="flex gap-3 w-full justify-center flex-wrap">
+                            <button onclick="setQuery('اشرح لي الدرس بشكل مبسط')" class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 px-4 py-2.5 rounded-xl flex items-center gap-2 transition cursor-pointer shadow-sm">
+                                <i class="fa-solid fa-book-open text-purple-500"></i> اشرح لي الدرس بشكل مبسط
+                            </button>
+                            <button onclick="setQuery('ما هي أهم أسئلة التمارين والأنشطة؟')" class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 px-4 py-2.5 rounded-xl flex items-center gap-2 transition cursor-pointer shadow-sm">
+                                <i class="fa-solid fa-clipboard-question text-amber-500"></i> ما هي أهم أسئلة التمارين والأنشطة؟
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                chatContainer.innerHTML = "";
+                subjectHistory.forEach((item) => {
+                    appendMessageToDOM(item.question, item.answer, false);
+                });
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function setQuery(text) {
+            document.getElementById('user-input').value = text;
+            sendMessage();
+        }
+
+        function appendMessageToDOM(question, answer, save = true) {
+            const chatContainer = document.getElementById('chat-container');
+            const welcome = document.getElementById('welcome-screen');
+            if (welcome) welcome.remove();
+
+            const isFav = favorites.some(fav => fav.question === question && fav.subject === currentSubject);
+
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = "space-y-3 w-full max-w-4xl mx-auto";
+            messageWrapper.innerHTML = `
+                <div class="flex justify-end">
+                    <div class="bg-zinc-200 dark:bg-[#27272a] text-zinc-900 dark:text-white px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-xs leading-relaxed shadow-sm">
+                        ${escapeHtml(question)}
+                    </div>
+                </div>
+                <div class="flex justify-start">
+                    <div class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 px-4 py-3.5 rounded-2xl rounded-br-sm max-w-[90%] md:max-w-[85%] text-xs leading-relaxed shadow-md relative group">
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-zinc-100 dark:border-zinc-800 text-[10px] text-zinc-400">
+                            <span class="font-bold text-yellow-600 dark:text-yellow-500 flex items-center gap-1"><i class="fa-solid fa-graduation-cap"></i> معلم ${currentSubject}</span>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleFavorite('${question.replace(/'/g, "\\'")}', '${answer.replace(/'/g, "\\'")}', '${currentSubject}')" class="${isFav ? 'text-amber-500' : 'text-zinc-400 hover:text-amber-500'} transition cursor-pointer" title="حفظ في المفضلة"><i class="fa-solid fa-star"></i></button>
+                                <button onclick="navigator.clipboard.writeText(this.parentElement.parentElement.nextElementSibling.innerText); showToast('تم نَسخ الإجابة بنجاح')" class="text-zinc-400 hover:text-zinc-200 transition cursor-pointer" title="نسخ"><i class="fa-solid fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="markdown-content">${marked.parse(answer)}</div>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            if (save) {
+                chatHistory.push({ subject: currentSubject, question, answer });
+                localStorage.setItem('smart_chat_history_v10', JSON.stringify(chatHistory));
+            }
+        }
+
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const qText = inputField.value.trim();
+            const apiKey = localStorage.getItem('smart_gemini_api_key');
+
+            if (!qText && !attachedImageBase64) return;
+            if (!apiKey) {
+                showToast("يرجى إدخال مفتاح Gemini API أولاً من القائمة الجانبية أو الزر العلوي", "error");
+                openApiKeyModal();
+                return;
+            }
+
+            const currentQ = qText || "اشرح لي هذه الصورة المتعلقة بالمنهج";
+            inputField.value = "";
+            const tempImg = attachedImageBase64;
+            const tempMime = attachedImageMimeType;
+            removeAttachedImage();
+
+            // إظهار رسالة المستخدم مؤقتاً
+            const chatContainer = document.getElementById('chat-container');
+            const welcome = document.getElementById('welcome-screen');
+            if (welcome) welcome.remove();
+
+            const loadingId = 'loading-' + Date.now();
+            const tempWrapper = document.createElement('div');
+            tempWrapper.id = loadingId;
+            tempWrapper.className = "space-y-3 w-full max-w-4xl mx-auto";
+            tempWrapper.innerHTML = `
+                <div class="flex justify-end"><div class="bg-zinc-200 dark:bg-[#27272a] text-zinc-900 dark:text-white px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-xs">${escapeHtml(currentQ)}</div></div>
+                <div class="flex justify-start"><div class="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 text-zinc-500 px-4 py-3.5 rounded-2xl text-xs flex items-center gap-2"><i class="fa-solid fa-spinner fa-spin text-yellow-500"></i> المعلم يراجع المنهج ويُجهز الإجابة...</div></div>
+            `;
+            chatContainer.appendChild(tempWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                // جلب البرومبت الضخم سراً من ملف المادة الخارجي (الـ 6-7 صفحات)
+                const systemPrompt = await getSystemPrompt(currentSubject);
+
+                let contentsArray = [];
+                let parts = [{ text: `[تعليمات المنهج للمادة]:\n${systemPrompt}\n\n[سؤال الطالب]: ${currentQ}` }];
+                if (tempImg) {
+                    parts.push({ inline_data: { mime_type: tempMime, data: tempImg } });
+                }
+                contentsArray.push({ role: "user", parts: parts });
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: contentsArray })
+                });
+
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    const aiAnswer = data.candidates[0].content.parts[0].text;
+                    appendMessageToDOM(currentQ, aiAnswer, true);
+                } else {
+                    showToast("عذراً، حدث خطأ في استجابة الذكاء الاصطناعي", "error");
+                }
+            } catch (err) {
+                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+                showToast("تعذر الاتصال بالخادم، تأكد من الإنترنت", "error");
+            }
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64String = e.target.result.split(',')[1];
+                attachedImageBase64 = base64String;
+                attachedImageMimeType = file.type;
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+                showToast("تم إرفاق الصورة بنجاح 🖼️");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeAttachedImage() {
+            attachedImageBase64 = null;
+            attachedImageMimeType = null;
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('image-file-input').value = "";
+            document.getElementById('camera-file-input').value = "";
+        }
+
+        function clearChat() {
+            chatHistory = chatHistory.filter(item => item.subject !== currentSubject);
+            localStorage.setItem('smart_chat_history_v10', JSON.stringify(chatHistory));
+            renderChatHistory();
+            showToast("تم مسح محادثات هذه المادة بنجاح");
+        }
+
+        function openNotebook() {
+            document.getElementById('notebook-title').innerText = `دفتر ملاحظات: ${currentSubject}`;
+            document.getElementById('notebook-content').value = notebooks[currentSubject] || "";
+            document.getElementById('notebook-modal').classList.remove('hidden');
+        }
+        function closeNotebook() { document.getElementById('notebook-modal').classList.add('hidden'); }
+        function saveNotebook() {
+            const val = document.getElementById('notebook-content').value;
+            notebooks[currentSubject] = val;
+            localStorage.setItem('smart_notebooks_v10', JSON.stringify(notebooks));
+            closeNotebook();
+            showToast("تم حفظ ملاحظات المادة بنجاح 📓");
+        }
+
+        fuElementById('api-key-input').value = localStorage.getItem('smart_gemini_api_key') || "";
+            document.getElementById('apiKey-modal').classList.remove('hidden');
+        }
+        function closeApiKeyModal() { document.getElementById('apiKey-modal').classList.add('hidden'); }
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if(!key) {
+                showToast("يرجى إدخال مفتاح صحيح", "error");
+                return;
+            }
+            localStorage.setItem('smart_gemini_api_key', key);
+            closeApiKeyModal();
+            showToast("تم حفظ مفتاح الـ API بنجاح 🔑");
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
